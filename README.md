@@ -1,4 +1,6 @@
-# Teoria das Filas — Calculadora (P108)
+# P108 - Otimização 2
+
+## Teoria das Filas 
 
 Este repositório contém uma aplicação Streamlit para exploração e cálculo de modelos clássicos de teoria das filas, desenvolvida como apoio à disciplina P108 — Otimização II (Inatel).
 
