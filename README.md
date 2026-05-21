@@ -50,8 +50,4 @@ Em seguida abra o link informado pelo Streamlit (normalmente http://localhost:85
 **Exemplo rápido**
 - Selecionar "M/M/1" na barra lateral, definir `λ=3` e `μ=4` e observar as métricas exibidas.
 
-**Contribuições e próximos passos**
-- Sugestões: adicionar `requirements.txt`, testes automatizados e exemplos predefinidos de cenários.
-- Abra uma issue ou envie um pull request com melhorias.
-
 ---
