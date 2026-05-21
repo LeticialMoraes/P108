@@ -11,7 +11,21 @@ Este repositório contém uma aplicação Streamlit para exploração e cálculo
 - Painel interativo com controles para parâmetros (λ, μ, s, K, N, σ², classes de prioridade).
 
 **Arquivos principais**
-- [filas_app.py](filas_app.py) — aplicação Streamlit principal com a lógica dos modelos e interface.
+- `src/app.py` — aplicação Streamlit principal.
+- `src/core.py` — implementações dos modelos de filas.
+- `src/ui.py` — componentes de exibição e gráficos.
+- `main.py` — wrapper de execução.
+- `filas_app.py` — wrapper legado compatível com o nome original.
+
+**Estrutura do projeto**
+- `src/`
+  - `app.py`
+  - `core.py`
+  - `ui.py`
+- `main.py`
+- `filas_app.py`
+- `requirements.txt`
+- `README.md`
 
 **Requisitos**
 - Python 3.8+ recomendado
@@ -35,6 +49,12 @@ No terminal, a partir da raiz do projeto execute:
 
 ```bash
 streamlit run filas_app.py
+```
+
+Como alternativa você pode iniciar o app através do wrapper principal:
+
+```bash
+python main.py
 ```
 
 Em seguida abra o link informado pelo Streamlit (normalmente http://localhost:8501).
