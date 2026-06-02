@@ -102,17 +102,46 @@ def mmsn(lam, mu, s, N):
     return dict(P0=P0, Pn=Pn, rho=N * lam / (s * mu), lam_eff=lam_eff, L=L, Lq=max(Lq, 0), W=W, Wq=Wq)
 
 
-def mg1(lam, mu, sigma2):
-    rho = lam / mu
+# =========================
+# M/G/1
+# Pollaczek–Khinchine
+# =========================
+def mg1(lam, mu, sigma2=None):
+
+    rho = lam/mu
+
     if rho >= 1:
         return None
-    P0 = 1 - rho
-    Lq = (lam**2 * sigma2 + rho**2) / (2 * (1 - rho))
-    L = rho + Lq
-    Wq = Lq / lam
-    W = Wq + 1 / mu
-    return dict(P0=P0, rho=rho, L=L, Lq=Lq, W=W, Wq=Wq)
 
+    P0 = 1-rho
+
+    # Se não passar variância:
+    # assume exponencial
+
+    if sigma2 is None:
+        sigma2 = (1/mu)**2
+
+    Lq = (
+        (lam**2*sigma2 + rho**2)
+        /
+        (2*(1-rho))
+    )
+
+    L = rho + Lq
+
+    Wq = Lq/lam
+
+    W = Wq + (1/mu)
+
+    return {
+        "P0":P0,
+        "rho":rho,
+        "sigma2":sigma2,
+        "L":L,
+        "Lq":Lq,
+        "W":W,
+        "Wq":Wq
+    }
 
 def priority_preemptive(lambdas, mu, s=1):
     K = len(lambdas)

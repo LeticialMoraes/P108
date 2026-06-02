@@ -1,4 +1,5 @@
 import sys
+import unicodedata
 from pathlib import Path
 
 import streamlit as st
@@ -81,7 +82,7 @@ section[data-testid="stSidebar"] label {
     background:white; border-radius:12px; padding:1.2rem 1.4rem;
     box-shadow:0 2px 12px rgba(0,0,0,.08); margin:0.5rem 0;
 }
-.priority-card h4 { margin:0 0 .8rem; font-size:.9rem; color:#1a1a2e; }
+.priority-card h4 { margin:0 .8rem; font-size:.9rem; color:#1a1a2e; }
 .prio-badge {
     display:inline-block; background:#e060b0; color:white;
     border-radius:20px; padding:.15rem .7rem; font-size:.75rem;
@@ -105,15 +106,6 @@ button[data-baseweb="tab"][aria-selected="true"] {
     background-color: #e060b0 !important;
     border-color: #e060b0 !important;
 }
-[data-baseweb="slider"] div[data-testid="stSlider"] div div div {
-    background: #e060b0 !important;
-}
-div[data-testid="stSlider"] > div > div > div > div {
-    background: #e060b0 !important;
-}
-[data-baseweb="slider"] [data-testid="stSlider"] {
-    accent-color: #e060b0 !important;
-}
 input[type="range"] { accent-color: #e060b0 !important; }
 div[class*="StyledThumb"] { background: #e060b0 !important; border-color: #e060b0 !important; }
 div[class*="StyledInnerThumb"] { background: white !important; }
@@ -134,6 +126,10 @@ input[type="checkbox"]:checked, input[type="radio"]:checked {
 </style>
 """
 
+# Rótulos exatos do select (usados na comparação de preemptivo)
+PRIORITY_PREEMPT_LABEL = "Prioridades — Com interrupção"
+PRIORITY_NONPREEMPT_LABEL = "Prioridades — Sem interrupção"
+
 ALL_MODELS = [
     "M/M/1   — Clássico (1 servidor, fila infinita)",
     "M/M/s   — Clássico (s servidores, fila infinita)",
@@ -142,8 +138,8 @@ ALL_MODELS = [
     "M/M/1/N — População finita (1 servidor)",
     "M/M/s/N — População finita (s servidores)",
     "M/G/1   — Serviço genérico (1 servidor)",
-    "Prioridades — Com interrupção",
-    "Prioridades — Sem interrupção",
+    PRIORITY_PREEMPT_LABEL,
+    PRIORITY_NONPREEMPT_LABEL,
 ]
 
 MODEL_DESCRIPTIONS = {
@@ -204,10 +200,29 @@ def main():
 
     st.markdown(CSS, unsafe_allow_html=True)
 
+    # ── session_state defaults ───────────────────────────────────────────────
+    if "model_idx" not in st.session_state:
+        st.session_state.model_idx = 0
+
+    # ── Sidebar ──────────────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown("## 🎛️ Configuração")
         st.markdown("---")
-        model = st.sidebar.selectbox("Modelo de Filas", ALL_MODELS, key="model")
+
+        # on_change atualiza model_idx apenas quando o dropdown fecha
+        def _on_model_change():
+            st.session_state.model_idx = ALL_MODELS.index(st.session_state._model_select)
+
+        st.selectbox(
+            "Modelo de Filas",
+            ALL_MODELS,
+            index=st.session_state.model_idx,
+            key="_model_select",
+            on_change=_on_model_change,
+        )
+
+        # Lê o modelo confirmado (não muda durante a abertura do dropdown)
+        model = ALL_MODELS[st.session_state.model_idx]
         model_key = model.split("—")[0].strip()
 
         st.markdown("---")
@@ -217,7 +232,6 @@ def main():
         is_mg1 = model_key.startswith("M/G/1")
         is_K = "/K" in model_key
         is_N = "/N" in model_key
-        is_mm1_inf = model_key == "M/M/1"
         is_mms_inf = model_key == "M/M/s"
         has_s = ("s/K" in model_key or "s/N" in model_key or is_mms_inf)
 
@@ -262,7 +276,7 @@ def main():
                 )
                 lambdas.append(lk)
 
-        time_unit = st.sidebar.selectbox("Unidade de tempo", ["min", "h", "s", "dias"], key="time_unit")
+        time_unit = st.selectbox("Unidade de tempo", ["min", "h", "s", "dias"], key="time_unit")
 
     st.markdown(
         """
@@ -378,7 +392,8 @@ def main():
                         st.pyplot(fig_g, use_container_width=True)
 
             elif is_priority:
-                preemptive = "Com interrupção" in model
+                _mn = unicodedata.normalize("NFC", model.strip())
+                preemptive = "Sem interrupção" not in _mn
                 lam_tot = sum(lambdas)
                 rho_tot = lam_tot / (s_p * mu_p)
                 if rho_tot >= 1:
