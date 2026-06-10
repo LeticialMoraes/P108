@@ -42,7 +42,7 @@ def metrics_html(items):
     return html + '</div>'
 
 
-def show_results(res, title, time_unit="min"):
+def show_results(res, title, time_unit="min", N=None):
     st.markdown(f'<div class="section-title">📊 {title}</div>', unsafe_allow_html=True)
     items = [
         ("P₀", f"{res['P0']:.5f}", "prob. sistema vazio"),
@@ -58,6 +58,9 @@ def show_results(res, title, time_unit="min"):
         ("W", f"{res['W']:.4f}", f"tempo no sistema ({time_unit})"),
         ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
     ]
+    if N is not None:
+        ativos = N - res['L']
+        items.append(("N − L", f"{ativos:.4f}", "população ativa (operacional)"))
     st.markdown(metrics_html(items), unsafe_allow_html=True)
     if 'Pn' in res:
         c1, c2 = st.columns([1, 2])

@@ -29,6 +29,16 @@ from src.ui import (
     show_priority_results,
     plot_priority_bars,
 )
+from src.conversion import (
+    DURATION_UNIT_LABEL,
+    RATE_UNIT_LABEL,
+    SECONDS_PER,
+    mu_per_second_from_mean_service,
+    rate_in_period,
+    rate_per_second,
+    scale_result_times_for_display,
+    variance_to_seconds_squared,
+)
 
 CSS = """
 <style>
@@ -235,9 +245,98 @@ def main():
         is_mms_inf = model_key == "M/M/s"
         has_s = ("s/K" in model_key or "s/N" in model_key or is_mms_inf)
 
+        time_unit = st.selectbox(
+            "Unidade para tempos (W, Wq) nos resultados",
+            ["min", "h", "s", "dias"],
+            key="time_unit",
+            help="Tempos médios exibidos nesta unidade. λ e μ podem ser informados em outras unidades abaixo.",
+        )
+
         if not is_priority:
-            lam = st.number_input("Taxa de chegada (λ)", min_value=0.0001, value=3.0, step=0.0001, format="%.4f")
-            mu = st.number_input("Taxa de serviço (μ)", min_value=0.0001, value=4.0, step=0.0001, format="%.4f")
+            unidade_lam = st.selectbox(
+                "Unidade da taxa λ",
+                ["s", "min", "h", "dias"],
+                format_func=lambda u: RATE_UNIT_LABEL[u],
+                index=1,
+                key="unidade_lam",
+                help=(
+                    "Deve bater com o enunciado. Ex.: «1 paciente por **hora**» → escolha **por hora** e digite 1. "
+                    "Se escolher **por minuto** e digitar 1, serão **60 por hora** (1 a cada minuto)."
+                ),
+            )
+            lam = st.number_input(
+                f"Taxa de chegada λ ({RATE_UNIT_LABEL[unidade_lam]})",
+                min_value=0.0001,
+                value=3.0,
+                step=0.0001,
+                format="%.4f",
+                help="Use o mesmo «por hora / por minuto» que o exercício. Veja o resumo de equivalentes logo abaixo.",
+            )
+            _lam_sec = rate_per_second(lam, unidade_lam)
+            st.caption(
+                f"Equiv.: **{rate_in_period(_lam_sec, 'h'):.4f}/h** · "
+                f"**{rate_in_period(_lam_sec, 'min'):.4f}/min** · "
+                f"{rate_in_period(_lam_sec, 's'):.6f}/s — compare com o enunciado."
+            )
+            modo_servico = st.radio(
+                "Como informar o serviço?",
+                [
+                    "Taxa μ (atendimentos por unidade de tempo)",
+                    "Tempo médio E[S] → calculamos μ = 1/E[S]",
+                ],
+                key="modo_servico",
+                help=(
+                    "Você pode usar, por exemplo, λ em **por hora** e E[S] em **minutos**; "
+                    "o app converte tudo internamente para calcular ρ, L e W."
+                ),
+            )
+            if modo_servico.startswith("Taxa μ"):
+                unidade_mu = st.selectbox(
+                    "Unidade da taxa μ",
+                    ["s", "min", "h", "dias"],
+                    format_func=lambda u: RATE_UNIT_LABEL[u],
+                    index=["s", "min", "h", "dias"].index(unidade_lam),
+                    key="unidade_mu",
+                )
+                mu = st.number_input(
+                    f"Taxa de serviço μ ({RATE_UNIT_LABEL[unidade_mu]})",
+                    min_value=0.0001,
+                    value=4.0,
+                    step=0.0001,
+                    format="%.4f",
+                    key="mu_taxa",
+                )
+                lam_sec = rate_per_second(lam, unidade_lam)
+                mu_sec = rate_per_second(mu, unidade_mu)
+            else:
+                unidade_es = st.selectbox(
+                    "Unidade de E[S] (tempo médio de serviço)",
+                    ["s", "min", "h", "dias"],
+                    format_func=lambda u: DURATION_UNIT_LABEL[u],
+                    index=1,
+                    key="unidade_es",
+                )
+                es = st.number_input(
+                    f"Tempo médio de serviço E[S] ({DURATION_UNIT_LABEL[unidade_es]})",
+                    min_value=0.0001,
+                    value=0.25,
+                    step=0.0001,
+                    format="%.4f",
+                    key="mu_tempo",
+                    help="Ex.: 45 min com unidade «minutos»; λ pode estar em «por hora».",
+                )
+                lam_sec = rate_per_second(lam, unidade_lam)
+                mu_sec = mu_per_second_from_mean_service(es, unidade_es)
+                mu_equiv_lam = rate_in_period(mu_sec, unidade_lam)
+                st.caption(
+                    f"μ equivalente ≈ **{mu_equiv_lam:.6f}** ({RATE_UNIT_LABEL[unidade_lam]}) "
+                    f"· **{rate_in_period(mu_sec, time_unit):.6f}** ({RATE_UNIT_LABEL[time_unit]})"
+                )
+                mu = rate_in_period(mu_sec, time_unit)
+
+            lam_title = rate_in_period(lam_sec, time_unit)
+            mu_title = rate_in_period(mu_sec, time_unit)
+
             s = st.number_input("Nº de servidores (s)", min_value=1, value=2, step=1) if has_s else 1
             if is_K:
                 K = st.number_input("Capacidade do sistema (K)", min_value=1, value=5, step=1)
@@ -249,25 +348,94 @@ def main():
                 K = None
                 N = None
             sigma2 = None
+            unidade_sigma2 = "min"
             if is_mg1:
+                unidade_sigma2 = st.selectbox(
+                    "Unidade de σ² (variância do tempo de serviço)",
+                    ["s", "min", "h", "dias"],
+                    format_func=lambda u: f"({DURATION_UNIT_LABEL[u]})²",
+                    index=1,
+                    key="unidade_sigma2",
+                )
                 sigma2 = st.number_input(
-                    "Variância do serviço (σ²)",
+                    f"Variância σ² em ({DURATION_UNIT_LABEL[unidade_sigma2]})²",
                     min_value=0.0,
                     value=round(1 / 36, 6),
                     step=0.0001,
                     format="%.6f",
-                    help="Para exp: σ²=1/μ². Para determinístico: σ²=0",
+                    help="Exponencial: σ² = (1/μ)² na mesma base que E[S]. Ex.: se μ em 1/min, σ² em min².",
                 )
         else:
             lam = mu = s = K = N = sigma2 = None
+            lam_sec = mu_sec = None
+            lam_title = mu_title = None
+            unidade_sigma2 = "min"
+
             st.markdown("**Número de classes de prioridade**")
             num_classes = st.number_input("Classes", min_value=2, max_value=6, value=3, step=1)
-            mu_p = st.number_input("Taxa de serviço (μ) — igual p/ todas", min_value=0.0001, value=3.0, step=0.0001, format="%.4f")
+
+            unidade_lam_p = st.selectbox(
+                "Unidade das taxas λₖ",
+                ["s", "min", "h", "dias"],
+                format_func=lambda u: RATE_UNIT_LABEL[u],
+                index=1,
+                key="unidade_lam_p",
+                help="Mesma regra: «por minuto» com 1 significa 1 chegada por minuto, não por hora.",
+            )
+
+            modo_servico_p = st.radio(
+                "Serviço (igual p/ todas as classes)",
+                [
+                    "Taxa μ (por unidade de tempo)",
+                    "Tempo médio E[S] → μ = 1/E[S]",
+                ],
+                key="modo_servico_p",
+                help="Mesma conversão que nos demais modelos; cada λₖ usa a unidade acima.",
+            )
+            if modo_servico_p.startswith("Taxa μ"):
+                unidade_mu_p = st.selectbox(
+                    "Unidade da taxa μ",
+                    ["s", "min", "h", "dias"],
+                    format_func=lambda u: RATE_UNIT_LABEL[u],
+                    index=["s", "min", "h", "dias"].index(st.session_state.get("unidade_lam_p", "min")),
+                    key="unidade_mu_p",
+                )
+                mu_p = st.number_input(
+                    f"Taxa de serviço μ ({RATE_UNIT_LABEL[unidade_mu_p]})",
+                    min_value=0.0001,
+                    value=3.0,
+                    step=0.0001,
+                    format="%.4f",
+                    key="mu_p_taxa",
+                )
+                mu_p_sec = rate_per_second(mu_p, unidade_mu_p)
+            else:
+                unidade_es_p = st.selectbox(
+                    "Unidade de E[S]",
+                    ["s", "min", "h", "dias"],
+                    format_func=lambda u: DURATION_UNIT_LABEL[u],
+                    index=1,
+                    key="unidade_es_p",
+                )
+                es_p = st.number_input(
+                    f"Tempo médio E[S] ({DURATION_UNIT_LABEL[unidade_es_p]})",
+                    min_value=0.0001,
+                    value=1 / 3.0,
+                    step=0.0001,
+                    format="%.4f",
+                    key="mu_p_tempo",
+                )
+                mu_p_sec = mu_per_second_from_mean_service(es_p, unidade_es_p)
+                st.caption(
+                    f"μ equivalente ≈ **{rate_in_period(mu_p_sec, unidade_lam_p):.6f}** "
+                    f"({RATE_UNIT_LABEL[unidade_lam_p]})"
+                )
+
             s_p = st.number_input("Nº de servidores (s)", min_value=1, value=1, step=1)
             lambdas = []
             for k in range(int(num_classes)):
                 lk = st.number_input(
-                    f"λ{k+1} (prioridade {k+1})",
+                    f"λ{k+1} ({RATE_UNIT_LABEL[unidade_lam_p]} · prioridade {k+1})",
                     min_value=0.0001,
                     value=DEFAULT_PRIORITY_LAMBDAS[k],
                     step=0.0001,
@@ -276,7 +444,7 @@ def main():
                 )
                 lambdas.append(lk)
 
-        time_unit = st.selectbox("Unidade de tempo", ["min", "h", "s", "dias"], key="time_unit")
+            lambdas_sec = [rate_per_second(lk, unidade_lam_p) for lk in lambdas]
 
     st.markdown(
         """
@@ -301,118 +469,190 @@ def main():
         )
 
         try:
-            if model_key == "M/M/1":
-                res = mm1(lam, mu)
-                if res is None:
-                    st.error(f"ρ = {lam/mu:.3f} ≥ 1. Sistema instável.")
-                else:
-                    show_results(res, f"M/M/1  λ={lam} μ={mu}", time_unit)
+            if not is_priority:
+                title_rates = RATE_UNIT_LABEL[time_unit]
+                rho_simple = lam_sec / mu_sec if mu_sec and mu_sec > 0 else float("inf")
 
-            elif model_key == "M/M/s":
-                s_v = int(s)
-                res = mms(lam, mu, s_v)
-                if res is None:
-                    st.error(f"ρ = {lam/(s_v*mu):.3f} ≥ 1. Sistema instável.")
-                else:
-                    show_results(res, f"M/M/{s_v}  λ={lam} μ={mu} s={s_v}", time_unit)
-                    st.markdown(
-                        f"""<div class="info-box">
-                    <b>Erlang-C (C)</b> = probabilidade de espera = {res['C']:.5f}
+                if model_key == "M/M/1":
+                    res_raw = mm1(lam_sec, mu_sec)
+                    if res_raw is None:
+                        st.error(f"ρ = {rho_simple:.3f} ≥ 1. Sistema instável.")
+                    else:
+                        res = scale_result_times_for_display(res_raw, time_unit)
+                        show_results(
+                            res,
+                            f"M/M/1  λ={lam_title:.4f} μ={mu_title:.4f} ({title_rates})",
+                            time_unit,
+                        )
+
+                elif model_key == "M/M/s":
+                    s_v = int(s)
+                    res_raw = mms(lam_sec, mu_sec, s_v)
+                    rho_s = lam_sec / (s_v * mu_sec) if mu_sec else float("inf")
+                    if res_raw is None:
+                        st.error(f"ρ = {rho_s:.3f} ≥ 1. Sistema instável.")
+                    else:
+                        res = scale_result_times_for_display(res_raw, time_unit)
+                        show_results(
+                            res,
+                            f"M/M/{s_v}  λ={lam_title:.4f} μ={mu_title:.4f} s={s_v} ({title_rates})",
+                            time_unit,
+                        )
+                        st.markdown(
+                            f"""<div class="info-box">
+                    <b>Erlang-C (C)</b> = probabilidade de espera = {res_raw['C']:.5f}
                 </div>""",
-                        unsafe_allow_html=True,
+                            unsafe_allow_html=True,
+                        )
+
+                elif model_key == "M/M/1/K":
+                    res_raw = mm1k(lam_sec, mu_sec, int(K))
+                    res = scale_result_times_for_display(res_raw, time_unit)
+                    show_results(
+                        res,
+                        f"M/M/1/K  λ={lam_title:.4f} μ={mu_title:.4f} K={int(K)} ({title_rates})",
+                        time_unit,
                     )
 
-            elif model_key == "M/M/1/K":
-                res = mm1k(lam, mu, int(K))
-                show_results(res, f"M/M/1/K  λ={lam} μ={mu} K={int(K)}", time_unit)
+                elif model_key == "M/M/s/K":
+                    s_v, K_v = int(s), int(K)
+                    if K_v < s_v:
+                        st.error("K deve ser ≥ s.")
+                    else:
+                        res_raw = mmsk(lam_sec, mu_sec, s_v, K_v)
+                        res = scale_result_times_for_display(res_raw, time_unit)
+                        show_results(
+                            res,
+                            f"M/M/{s_v}/K  λ={lam_title:.4f} μ={mu_title:.4f} s={s_v} K={K_v} ({title_rates})",
+                            time_unit,
+                        )
 
-            elif model_key == "M/M/s/K":
-                s_v, K_v = int(s), int(K)
-                if K_v < s_v:
-                    st.error("K deve ser ≥ s.")
-                else:
-                    res = mmsk(lam, mu, s_v, K_v)
-                    show_results(res, f"M/M/{s_v}/K  λ={lam} μ={mu} s={s_v} K={K_v}", time_unit)
-
-            elif model_key == "M/M/1/N":
-                res = mm1n(lam, mu, int(N))
-                show_results(res, f"M/M/1/N  λ={lam} μ={mu} N={int(N)}", time_unit)
-
-            elif model_key == "M/M/s/N":
-                s_v, N_v = int(s), int(N)
-                res = mmsn(lam, mu, s_v, N_v)
-                show_results(res, f"M/M/{s_v}/N  λ={lam} μ={mu} s={s_v} N={N_v}", time_unit)
-
-            elif is_mg1:
-                res = mg1(lam, mu, sigma2)
-                if res is None:
-                    st.error(f"ρ = {lam/mu:.3f} ≥ 1. Sistema instável.")
-                else:
-                    st.markdown(
-                        f'<div class="section-title">📊 M/G/1 — λ={lam} μ={mu} σ²={sigma2:.5f}</div>',
-                        unsafe_allow_html=True,
+                elif model_key == "M/M/1/N":
+                    res_raw = mm1n(lam_sec, mu_sec, int(N))
+                    res = scale_result_times_for_display(res_raw, time_unit)
+                    show_results(
+                        res,
+                        f"M/M/1/N  λ={lam_title:.4f} μ={mu_title:.4f} N={int(N)} ({title_rates})",
+                        time_unit,
+                        N=int(N),
                     )
-                    items = [
-                        ("P₀", f"{res['P0']:.5f}", "prob. sistema vazio"),
-                        ("ρ", f"{res['rho']:.4f}", "utilização"),
-                        ("L", f"{res['L']:.4f}", "clientes no sistema"),
-                        ("Lq", f"{res['Lq']:.4f}", "clientes na fila"),
-                        ("W", f"{res['W']:.4f}", f"tempo no sistema ({time_unit})"),
-                        ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
-                    ]
-                    st.markdown(metrics_html(items), unsafe_allow_html=True)
 
-                    st.markdown("---")
-                    st.markdown("#### Comparação com M/M/1 (σ²=1/μ²)")
-                    sig2_mm1 = 1 / mu**2
-                    res_mm1 = mg1(lam, mu, sig2_mm1)
-                    if res_mm1:
-                        ratio = res['Lq'] / res_mm1['Lq'] if res_mm1['Lq'] > 0 else float('nan')
-                        cols = st.columns(3)
-                        cols[0].metric("Lq (M/G/1)", f"{res['Lq']:.4f}")
-                        cols[1].metric("Lq (M/M/1)", f"{res_mm1['Lq']:.4f}")
-                        cols[2].metric("Razão Lq", f"{ratio:.4f}", help="Lq(M/G/1) / Lq(M/M/1)")
+                elif model_key == "M/M/s/N":
+                    s_v, N_v = int(s), int(N)
+                    res_raw = mmsn(lam_sec, mu_sec, s_v, N_v)
+                    res = scale_result_times_for_display(res_raw, time_unit)
+                    show_results(
+                        res,
+                        f"M/M/{s_v}/N  λ={lam_title:.4f} μ={mu_title:.4f} s={s_v} N={N_v} ({title_rates})",
+                        time_unit,
+                        N=N_v,
+                    )
 
-                        sig_vals = np.linspace(0, 2 / mu**2, 60)
-                        lqs = [(lam**2 * sv + res['rho']**2) / (2 * (1 - res['rho'])) for sv in sig_vals]
-                        fig_g, ax = plt.subplots(figsize=(8, 3))
-                        ax.plot(sig_vals, lqs, color='#e060b0', lw=2.5)
-                        ax.axvline(sigma2, color='#a050c8', ls='--', lw=1.5, label=f'σ²={sigma2:.4f}')
-                        ax.axvline(1 / mu**2, color='#dba8ef', ls='--', lw=1.5, label='σ²=1/μ² (Exp)')
-                        ax.set_xlabel("σ²")
-                        ax.set_ylabel("Lq")
-                        ax.set_title("Sensibilidade de Lq à variância do serviço")
-                        ax.legend()
-                        ax.grid(alpha=.3)
-                        ax.spines['top'].set_visible(False)
-                        ax.spines['right'].set_visible(False)
-                        fig_g.patch.set_facecolor('#f7f9fc')
-                        ax.set_facecolor('#f7f9fc')
-                        plt.tight_layout()
-                        st.pyplot(fig_g, use_container_width=True)
+                elif is_mg1:
+                    sigma2_sec = variance_to_seconds_squared(sigma2, unidade_sigma2)
+                    res_raw = mg1(lam_sec, mu_sec, sigma2_sec)
+                    rho_mg = lam_sec / mu_sec if mu_sec else float("inf")
+                    if res_raw is None:
+                        st.error(f"ρ = {rho_mg:.3f} ≥ 1. Sistema instável.")
+                    else:
+                        res = scale_result_times_for_display(res_raw, time_unit)
+                        sigma2_disp_tu = sigma2_sec / (SECONDS_PER[time_unit] ** 2)
+                        sig2_mm1_sec = 1 / (mu_sec**2)
+
+                        st.markdown(
+                            f'<div class="section-title">📊 M/G/1 — λ={lam_title:.4f} μ={mu_title:.4f} '
+                            f"σ²={sigma2:.5f} ({DURATION_UNIT_LABEL[unidade_sigma2]})² · "
+                            f"equiv. {sigma2_disp_tu:.5f} ({time_unit})²</div>",
+                            unsafe_allow_html=True,
+                        )
+                        items = [
+                            ("P₀", f"{res['P0']:.5f}", "prob. sistema vazio"),
+                            ("ρ", f"{res['rho']:.4f}", "utilização"),
+                            ("L", f"{res['L']:.4f}", "clientes no sistema"),
+                            ("Lq", f"{res['Lq']:.4f}", "clientes na fila"),
+                            ("W", f"{res['W']:.4f}", f"tempo no sistema ({time_unit})"),
+                            ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
+                        ]
+                        st.markdown(metrics_html(items), unsafe_allow_html=True)
+
+                        st.markdown("---")
+                        st.markdown("#### Comparação com M/M/1 (σ²=1/μ²)")
+                        res_mm1_raw = mg1(lam_sec, mu_sec, sig2_mm1_sec)
+                        res_mm1 = scale_result_times_for_display(res_mm1_raw, time_unit)
+                        if res_mm1:
+                            ratio = res['Lq'] / res_mm1['Lq'] if res_mm1['Lq'] > 0 else float("nan")
+                            cols = st.columns(3)
+                            cols[0].metric("Lq (M/G/1)", f"{res['Lq']:.4f}")
+                            cols[1].metric("Lq (M/M/1)", f"{res_mm1['Lq']:.4f}")
+                            cols[2].metric("Razão Lq", f"{ratio:.4f}", help="Lq(M/G/1) / Lq(M/M/1)")
+
+                            tu2 = SECONDS_PER[time_unit] ** 2
+                            sig_vals_sec = np.linspace(0, 2 / mu_sec**2, 60)
+                            sig_plot = sig_vals_sec / tu2
+                            rho = res_raw["rho"]
+                            lqs = [
+                                (lam_sec**2 * sv + rho**2) / (2 * (1 - rho))
+                                for sv in sig_vals_sec
+                            ]
+                            fig_g, ax = plt.subplots(figsize=(8, 3))
+                            ax.plot(sig_plot, lqs, color="#e060b0", lw=2.5)
+                            ax.axvline(
+                                sigma2_disp_tu,
+                                color="#a050c8",
+                                ls="--",
+                                lw=1.5,
+                                label=f"σ² atual ({time_unit}²)",
+                            )
+                            ax.axvline(
+                                sig2_mm1_sec / tu2,
+                                color="#dba8ef",
+                                ls="--",
+                                lw=1.5,
+                                label=f"σ²=1/μ² Exp ({time_unit}²)",
+                            )
+                            ax.set_xlabel(f"σ² em ({time_unit})²")
+                            ax.set_ylabel("Lq")
+                            ax.set_title("Sensibilidade de Lq à variância do serviço")
+                            ax.legend()
+                            ax.grid(alpha=0.3)
+                            ax.spines["top"].set_visible(False)
+                            ax.spines["right"].set_visible(False)
+                            fig_g.patch.set_facecolor("#f7f9fc")
+                            ax.set_facecolor("#f7f9fc")
+                            plt.tight_layout()
+                            st.pyplot(fig_g, use_container_width=True)
 
             elif is_priority:
                 _mn = unicodedata.normalize("NFC", model.strip())
                 preemptive = "Sem interrupção" not in _mn
                 lam_tot = sum(lambdas)
-                rho_tot = lam_tot / (s_p * mu_p)
+                lam_tot_sec = sum(lambdas_sec)
+                rho_tot = lam_tot_sec / (int(s_p) * mu_p_sec) if mu_p_sec > 0 else float("inf")
+                mu_display = rate_in_period(mu_p_sec, time_unit)
+
                 if rho_tot >= 1:
                     st.error(f"ρ total = {rho_tot:.3f} ≥ 1. Sistema instável.")
                 else:
                     results = (
-                        priority_preemptive(lambdas, mu_p, int(s_p))
+                        priority_preemptive(lambdas_sec, mu_p_sec, int(s_p))
                         if preemptive
-                        else priority_nonpreemptive(lambdas, mu_p, int(s_p))
+                        else priority_nonpreemptive(lambdas_sec, mu_p_sec, int(s_p))
                     )
+                    for i, r in enumerate(results):
+                        rr = scale_result_times_for_display(r, time_unit)
+                        r["W"], r["Wq"] = rr["W"], rr["Wq"]
+                        r["lam"] = lambdas[i]
+
                     tipo = "Com interrupção (Preemptivo)" if preemptive else "Sem interrupção (Não-preemptivo)"
                     st.markdown(
-                        f'<div class="section-title">📊 Prioridades — {tipo} | s={int(s_p)} μ={mu_p}</div>',
+                        f'<div class="section-title">📊 Prioridades — {tipo} | s={int(s_p)} '
+                        f"μ={mu_display:.4f} ({RATE_UNIT_LABEL[time_unit]})</div>",
                         unsafe_allow_html=True,
                     )
                     st.markdown(
                         f"""
                 <div class="info-box">
-                  λ total = {lam_tot:.3f} · μ = {mu_p} · s = {int(s_p)} · ρ total = {rho_tot:.4f}
+                  λ total = {lam_tot:.3f} ({RATE_UNIT_LABEL[unidade_lam_p]}) · μ = {mu_display:.4f} ({RATE_UNIT_LABEL[time_unit]}) · s = {int(s_p)} · ρ total = {rho_tot:.4f}
                 </div>""",
                         unsafe_allow_html=True,
                     )
@@ -420,23 +660,26 @@ def main():
                     st.pyplot(plot_priority_bars(results, time_unit), use_container_width=True)
 
                     st.markdown("---")
-                    df_prio = pd.DataFrame([
-                        {
-                            "Prioridade": f"P{r['k']}",
-                            "λₖ": r['lam'],
-                            "ρₖ": f"{r['rho']:.4f}",
-                            "W": f"{r['W']:.5f}",
-                            "Wq": f"{r['Wq']:.5f}",
-                            "L": f"{r['L']:.5f}",
-                            "Lq": f"{r['Lq']:.5f}",
-                        }
-                        for r in results
-                    ])
+                    df_prio = pd.DataFrame(
+                        [
+                            {
+                                "Prioridade": f"P{r['k']}",
+                                "λₖ": r["lam"],
+                                "ρₖ": f"{r['rho']:.4f}",
+                                "W": f"{r['W']:.5f}",
+                                "Wq": f"{r['Wq']:.5f}",
+                                "L": f"{r['L']:.5f}",
+                                "Lq": f"{r['Lq']:.5f}",
+                            }
+                            for r in results
+                        ]
+                    )
                     st.dataframe(df_prio, use_container_width=True, hide_index=True)
 
         except Exception as e:
             st.error(f"Erro: {e}")
             import traceback
+
             st.code(traceback.format_exc())
 
     with tab_theory:
@@ -548,6 +791,10 @@ Para s=1: o termo base se simplifica diretamente.
 
     with tab_sens:
         st.markdown("### Análise de Sensibilidade")
+        st.caption(
+            "Nesta aba, **λ e μ devem estar na mesma unidade de taxa** (ex.: ambos «por minuto»). "
+            "Use a barra lateral para misturar unidades (ex.: λ/h e E[S] em minutos)."
+        )
         c1, c2, c3 = st.columns(3)
         with c1:
             sm = st.selectbox("Modelo", ["M/M/1/K", "M/M/s/K", "M/M/1/N", "M/M/s/N"], key="sm")
