@@ -9,10 +9,13 @@ Este repositório contém uma aplicação Streamlit para exploração e cálculo
 - Análise de sistemas com prioridades (preemptivo e não-preemptivo).
 - Exibição de métricas-chave (P0, ρ, L, Lq, W, Wq), distribuições P(n) e gráficos.
 - Painel interativo com controles para parâmetros (λ, μ, s, K, N, σ², classes de prioridade).
+- **Unidades independentes**: você pode informar, por exemplo, λ em **por hora** e o tempo médio de serviço E[S] em **minutos**; o app normaliza internamente (base em segundos) e exibe W/Wq na unidade escolhida para resultados.
+- **Entrada direta (M/M/* e M/G/1)**: **Chegadas** como λ + unidade ou tempo médio entre chegadas (**valor + unidade** ou **soma** em dias/horas/minutos/segundos). **Serviço** como μ + unidade ou tempo médio de serviço (idem). O app converte internamente (λ = 1/tempo entre chegadas, μ = 1/E[S]). **Conferência** resume λ e μ efetivos antes dos resultados.
 
 **Arquivos principais**
 - `src/app.py` — aplicação Streamlit principal.
 - `src/core.py` — implementações dos modelos de filas.
+- `src/conversion.py` — conversão de taxas (λ, μ) e durações (E[S], σ²) para base comum.
 - `src/ui.py` — componentes de exibição e gráficos.
 - `main.py` — wrapper de execução.
 - `filas_app.py` — wrapper legado compatível com o nome original.
@@ -21,7 +24,7 @@ Este repositório contém uma aplicação Streamlit para exploração e cálculo
 - `src/`
   - `app.py`
   - `core.py`
-  - `ui.py`
+  - `conversion.py`
 - `main.py`
 - `filas_app.py`
 - `requirements.txt`
