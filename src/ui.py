@@ -44,35 +44,63 @@ def metrics_html(items):
 
 def show_results(res, title, time_unit="min"):
     st.markdown(f'<div class="section-title">📊 {title}</div>', unsafe_allow_html=True)
+
     items = [
         ("P₀", f"{res['P0']:.5f}", "prob. sistema vazio"),
         ("ρ", f"{res['rho']:.4f}", "utilização"),
     ]
+
     if 'lam_eff' in res:
         items.append(("λ̄", f"{res['lam_eff']:.4f}", f"taxa efetiva ({time_unit}⁻¹)"))
+
     if 'PK' in res:
         items.append(("P_K", f"{res['PK']:.5f}", "prob. bloqueio"))
+
     items += [
         ("L", f"{res['L']:.4f}", "clientes no sistema"),
         ("Lq", f"{res['Lq']:.4f}", "clientes na fila"),
         ("W", f"{res['W']:.4f}", f"tempo no sistema ({time_unit})"),
         ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
     ]
+
+    if 'P_Wq_1' in res:
+        items += [
+            (
+                "P(Wq>1)",
+                f"{res['P_Wq_1']*100:.2f}%",
+                "espera > 1 unidade"
+            ),
+            (
+                "P(W>1)",
+                f"{res['P_W_1']*100:.2f}%",
+                "sistema > 1 unidade"
+            ),
+        ]
+
     st.markdown(metrics_html(items), unsafe_allow_html=True)
+
     if 'Pn' in res:
         c1, c2 = st.columns([1, 2])
+
         with c1:
             st.markdown('<div class="section-title">Tabela P(n)</div>', unsafe_allow_html=True)
+
             df = pd.DataFrame({
                 "n": range(len(res['Pn'])),
                 "P(n)": [f"{p:.6f}" for p in res['Pn']],
                 "%": [f"{p*100:.3f}%" for p in res['Pn']],
             })
-            st.dataframe(df, use_container_width=True, hide_index=True, height=280)
+
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                height=280
+            )
+
         with c2:
             st.markdown('<div class="section-title">Gráfico</div>', unsafe_allow_html=True)
             st.pyplot(plot_probs(res['Pn']), use_container_width=True)
-
 
 def show_priority_results(results, time_unit="min"):
     for r in results:

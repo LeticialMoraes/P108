@@ -236,8 +236,54 @@ def main():
         has_s = ("s/K" in model_key or "s/N" in model_key or is_mms_inf)
 
         if not is_priority:
-            lam = st.number_input("Taxa de chegada (λ)", min_value=0.0001, value=3.0, step=0.0001, format="%.4f")
-            mu = st.number_input("Taxa de serviço (μ)", min_value=0.0001, value=4.0, step=0.0001, format="%.4f")
+            tipo_entrada = st.radio(
+                "Forma de entrada",
+                ["Taxas (λ e μ)", "Tempos médios"]
+            )
+
+            if tipo_entrada == "Taxas (λ e μ)":
+                lam = st.number_input(
+                    "Taxa de chegada (λ)",
+                    min_value=0.0001,
+                    value=3.0,
+                    step=0.0001,
+                    format="%.4f",
+                )
+                mu = st.number_input(
+                    "Taxa de serviço (μ)",
+                    min_value=0.0001,
+                    value=4.0,
+                    step=0.0001,
+                    format="%.4f",
+                )
+            else:
+                unidade_tempo = st.selectbox(
+                    "Unidade dos tempos",
+                    ["minutos", "horas", "segundos"]
+                )
+                tempo_chegada = st.number_input(
+                    "Tempo médio entre chegadas",
+                    min_value=0.0001,
+                    value=20.0,
+                    step=0.1,
+                )
+                tempo_servico = st.number_input(
+                    "Tempo médio de atendimento",
+                    min_value=0.0001,
+                    value=15.0,
+                    step=0.1,
+                )
+                if unidade_tempo == "minutos":
+                    lam = 60.0 / tempo_chegada
+                    mu = 60.0 / tempo_servico
+                elif unidade_tempo == "horas":
+                    lam = 1.0 / tempo_chegada
+                    mu = 1.0 / tempo_servico
+                else:  # segundos
+                    lam = 1.0 / tempo_chegada
+                    mu = 1.0 / tempo_servico
+                st.success(f"λ = {lam:.4f} chegadas/{unidade_tempo}  |  μ = {mu:.4f} serviços/{unidade_tempo}")
+
             s = st.number_input("Nº de servidores (s)", min_value=1, value=2, step=1) if has_s else 1
             if is_K:
                 K = st.number_input("Capacidade do sistema (K)", min_value=1, value=5, step=1)
