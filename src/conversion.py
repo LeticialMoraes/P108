@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import math
 import copy
+import math
 
 # Duração de 1 "unidade nomeada" em segundos
 SECONDS_PER = {
@@ -36,6 +36,28 @@ def rate_per_second(value: float, rate_period: str) -> float:
 def duration_to_seconds(value: float, duration_unit: str) -> float:
     """Duração em min/h/... → segundos."""
     return value * SECONDS_PER[duration_unit]
+
+
+def compound_duration_to_seconds(
+    dias: float = 0.0,
+    horas: float = 0.0,
+    minutos: float = 0.0,
+    segundos: float = 0.0,
+) -> float:
+    """
+    Soma explícita em segundos (sem interpretar texto).
+
+    total = dias×86400 + horas×3600 + minutos×60 + segundos
+    """
+    total = (
+        float(dias) * SECONDS_PER["dias"]
+        + float(horas) * SECONDS_PER["h"]
+        + float(minutos) * SECONDS_PER["min"]
+        + float(segundos) * SECONDS_PER["s"]
+    )
+    if not math.isfinite(total) or total <= 0:
+        raise ValueError("O tempo composto deve somar um valor positivo (preencha dias/horas/minutos/segundos).")
+    return total
 
 
 def mu_per_second_from_mean_service(es: float, duration_unit: str) -> float:
@@ -89,6 +111,7 @@ __all__ = [
     "DURATION_UNIT_LABEL",
     "rate_per_second",
     "duration_to_seconds",
+    "compound_duration_to_seconds",
     "mu_per_second_from_mean_service",
     "variance_to_seconds_squared",
     "rate_in_period",
