@@ -6,18 +6,51 @@ def fac(n):
 
 
 def mm1(lam, mu):
+    if mu <= 0:
+        return None
+
+    if lam < 0:
+        return None
+
     rho = lam / mu
+
     if rho >= 1:
         return None
+
     P0 = 1 - rho
+
     Lq = rho**2 / (1 - rho)
     L = rho + Lq
+
     Wq = Lq / lam
-    W = Wq + 1 / mu
-    return dict(P0=P0, rho=rho, L=L, Lq=Lq, W=W, Wq=Wq)
+    W = Wq + (1 / mu)
+
+    # Probabilidades extras
+    P_Wq_1 = rho * math.exp(-(mu - lam))
+    P_W_1 = math.exp(-(mu - lam))
+
+    return dict(
+        P0=P0,
+        rho=rho,
+        L=L,
+        Lq=Lq,
+        W=W,
+        Wq=Wq,
+        P_Wq_1=P_Wq_1,
+        P_W_1=P_W_1
+    )
 
 
 def mms(lam, mu, s):
+    if mu <= 0:
+        return None
+    
+    if lam < 0:
+        return None
+    
+    if s < 1:
+        return None
+
     rho = lam / (s * mu)
     r = lam / mu
     if rho >= 1:
@@ -34,6 +67,15 @@ def mms(lam, mu, s):
 
 
 def mm1k(lam, mu, K):
+    if mu <= 0:
+        return None
+    
+    if lam < 0:
+        return None
+    
+    if K < 0:
+        return None
+
     rho = lam / mu
     if abs(rho - 1.0) < 1e-12:
         P0 = 1 / (K + 1)
