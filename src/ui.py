@@ -42,7 +42,7 @@ def metrics_html(items):
     return html + '</div>'
 
 
-def show_results(res, title, time_unit="min"):
+def show_results(res, title, time_unit="min", N=None, finite_model=None, s_servers=1):
     st.markdown(f'<div class="section-title">📊 {title}</div>', unsafe_allow_html=True)
 
     items = [
@@ -77,7 +77,44 @@ def show_results(res, title, time_unit="min"):
             ),
         ]
 
+    if N is not None and finite_model is None:
+        ativos = N - res["L"]
+        items.append(("N − L", f"{ativos:.4f}", "população ativa (operacional)"))
     st.markdown(metrics_html(items), unsafe_allow_html=True)
+
+    if finite_model == "mm1n" and N is not None:
+        L = float(res["L"])
+        p0 = float(res["P0"])
+        util_srv = 1.0 - p0
+        n_minus_l = float(N) - L
+        prop = n_minus_l / float(N) if N else float("nan")
+        op_items = [
+            ("1 − P₀", f"{util_srv:.5f}", "utilização do servidor"),
+            ("(N − L)/N", f"{prop:.5f}", "prop. média da pop. operando"),
+            ("N − L", f"{n_minus_l:.4f}", "qtd. média da pop. operando"),
+        ]
+        st.markdown(
+            '<div class="section-title" style="margin-top:1.1rem">🔧 Indicadores operacionais</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(metrics_html(op_items), unsafe_allow_html=True)
+
+    elif finite_model == "mmsn" and N is not None:
+        L = float(res["L"])
+        n_minus_l = float(N) - L
+        prop = n_minus_l / float(N) if N else float("nan")
+        rho_bar = float(res["rho"])
+        s_v = int(s_servers)
+        op_items = [
+            ("N − L", f"{n_minus_l:.4f}", "qtd. média da pop. operando"),
+            ("(N − L)/N", f"{prop:.5f}", "prop. média da pop. operando"),
+            ("λ̄/(sμ)", f"{rho_bar:.5f}", f"util. média dos servidores (s = {s_v})"),
+        ]
+        st.markdown(
+            '<div class="section-title" style="margin-top:1.1rem">🔧 Indicadores operacionais</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(metrics_html(op_items), unsafe_allow_html=True)
 
     if 'Pn' in res:
         c1, c2 = st.columns([1, 2])

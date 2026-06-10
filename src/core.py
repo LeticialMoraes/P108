@@ -115,33 +115,79 @@ def mmsk(lam, mu, s, K):
 
 
 def mm1n(lam, mu, N):
-    r = lam / mu
-    den = sum(math.factorial(N) / math.factorial(N - n) * r**n for n in range(N + 1))
-    P0 = 1 / den
-    Pn = [math.factorial(N) / math.factorial(N - n) * r**n * P0 for n in range(N + 1)]
-    L = N - (mu / lam) * (1 - P0)
-    Lq = N - ((lam + mu) / lam) * (1 - P0)
-    lam_eff = lam * (N - L)
-    W = L / lam_eff if lam_eff > 0 else float('inf')
-    Wq = max(Lq, 0) / lam_eff if lam_eff > 0 else float('inf')
-    return dict(P0=P0, Pn=Pn, rho=N * lam / mu, lam_eff=lam_eff, L=L, Lq=max(Lq, 0), W=W, Wq=Wq)
+    Pn = [0.0] * (N + 1)
+    # Probabilidade não normalizada
+    Pn[0] = 1.0
+    for n in range(1, N + 1):
+        lambda_prev = (N - (n - 1)) * lam
+        # Como é M/M/1/N:
+        mu_curr = mu
+        Pn[n] = Pn[n - 1] * lambda_prev / mu_curr
+
+    # Normalização
+    norm = sum(Pn)
+    P0 = 1 / norm
+    Pn = [p * P0 for p in Pn]
+    # Número médio no sistema
+    L = sum(n * p for n, p in enumerate(Pn))
+    # Taxa efetiva
+    lam_eff = sum(
+        (N - n) * lam * Pn[n]
+        for n in range(N + 1)
+    )
+    # Número médio em serviço
+    Ls = 1 - P0
+    # Número médio na fila
+    Lq = max(L - Ls, 0)
+    # Tempos médios
+    W = L / lam_eff if lam_eff > 0 else float("inf")
+    Wq = Lq / lam_eff if lam_eff > 0 else float("inf")
+    # Utilização real
+    rho = lam_eff / mu
+    return dict(
+        P0=P0,
+        Pn=Pn,
+        rho=rho,
+        lam_eff=lam_eff,
+        L=L,
+        Lq=Lq,
+        W=W,
+        Wq=Wq,
+    )
 
 
 def mmsn(lam, mu, s, N):
-    r = lam / mu
-    def pf(n):
-        if n <= s:
-            return math.factorial(N) / (math.factorial(N - n) * math.factorial(n)) * r**n
-        return math.factorial(N) / (math.factorial(N - n) * math.factorial(s) * s**(n - s)) * r**n
-    den = sum(pf(n) for n in range(N + 1))
-    P0 = 1 / den
-    Pn = [pf(n) * P0 for n in range(N + 1)]
-    L = sum(n * Pn[n] for n in range(N + 1))
-    Lq = L - r * (N - L)
-    lam_eff = lam * (N - L)
-    W = L / lam_eff if lam_eff > 0 else float('inf')
-    Wq = max(Lq, 0) / lam_eff if lam_eff > 0 else float('inf')
-    return dict(P0=P0, Pn=Pn, rho=N * lam / (s * mu), lam_eff=lam_eff, L=L, Lq=max(Lq, 0), W=W, Wq=Wq)
+    Pn = [0.0] * (N + 1)
+    Pn[0] = 1.0
+    for n in range(1, N + 1):
+        lambda_prev = (N - (n - 1)) * lam
+        mu_curr = min(n, s) * mu
+        Pn[n] = Pn[n - 1] * lambda_prev / mu_curr
+    norm = sum(Pn)
+    P0 = 1 / norm
+    Pn = [p * P0 for p in Pn]
+    L = sum(n * p for n, p in enumerate(Pn))
+    lam_eff = sum(
+        (N - n) * lam * Pn[n]
+        for n in range(N + 1)
+    )
+    Lq = sum(
+        max(n - s, 0) * Pn[n]
+        for n in range(N + 1)
+    )
+    W = L / lam_eff if lam_eff > 0 else float("inf")
+    Wq = Lq / lam_eff if lam_eff > 0 else float("inf")
+    rho = lam_eff / (s * mu)
+    return dict(
+        P0=P0,
+        Pn=Pn,
+        rho=rho,
+        lam_eff=lam_eff,
+        L=L,
+        Lq=Lq,
+        W=W,
+        Wq=Wq,
+    )
 
 
 # =========================
