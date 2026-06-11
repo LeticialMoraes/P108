@@ -1155,10 +1155,24 @@ O cliente em atendimento é **interrompido** quando chega um de prioridade maior
 
 **W_k = (1/μ) / [(1 − A_{k−1})(1 − A_k)]**
 
-onde **A_k = Σᵢ₌₁ᵏ ρᵢ** e **ρᵢ = λᵢ/(sμ)**
+onde
 
-- Lq_k = L_k − λ_k/μ  ·  Wq_k = W_k − 1/μ  ·  L_k = λ_k · W_k
-                """
+**A_k = Σᵢ₌₁ᵏ ρᵢ**
+
+e
+
+**ρᵢ = λᵢ/(sμ)**
+
+Com
+
+**Λ_k = Σᵢ₌₁ᵏ λᵢ**
+
+temos:
+
+- **Wq_k = W_k − 1/μ**
+- **L_k = Λ_k · W_k**
+- **Lq_k = L_k − Λ_k/μ**
+        """
             )
         with st.expander("📌 Prioridades — Sem interrupção (Não-preemptivo)"):
             st.markdown(
@@ -1167,10 +1181,22 @@ O cliente em atendimento **conclui** antes de ceder lugar a um de maior priorida
 
 **W_k = 1 / [(s!·(sμ−λ)/rˢ·Σrʲ/j! + sμ)·(1−A_{k−1})·(1−A_k)] + 1/μ**
 
-onde **r = λ/μ** e **A_k = Σᵢ₌₁ᵏ ρᵢ**
+onde
 
-Para s=1: o termo base se simplifica diretamente.
-                """
+**r = λ/μ**
+
+**A_k = Σᵢ₌₁ᵏ ρᵢ**
+
+**ρᵢ = λᵢ/(sμ)**
+
+Temos ainda:
+
+- **Wq_k = W_k − 1/μ**
+- **L_k = λ_k · W_k**
+- **Lq_k = λ_k · Wq_k**
+
+Para **s = 1**, o termo base se simplifica diretamente.
+        """
             )
         with st.expander("📖 Referências"):
             st.markdown(
