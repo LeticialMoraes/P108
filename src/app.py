@@ -1076,20 +1076,89 @@ def main():
             st.code(traceback.format_exc())
 
     with tab_theory:
-        st.markdown("### Resumo dos Modelos")
+        st.markdown("### Material didático — Teoria das Filas")
+        st.markdown(
+            """
+Esta aba explica **o que cada símbolo mede** e, em cada modelo, **como ler as fórmulas** em linguagem
+cotidiana. Use em conjunto com a **Calculadora** para associar o enunciado ao desenho matemático do sistema
+(chegadas, serviço, capacidade, prioridades).
+            """.strip()
+        )
+
+        with st.expander("📚 Significado dos Símbolos (λ, μ, ρ, L, W, …)", expanded=False):
+            st.markdown(
+                """
+| Símbolo | Significado | Como interpretar (exemplos numéricos) |
+|:-------:|-------------|----------------------------------------|
+| **λ** | Taxa média de **chegada** de clientes ao sistema (por unidade de tempo), quando o processo de chegadas está descrito em termos de Poisson. | *Ex.:* λ = **4 por hora** → em média **4 chegadas** a cada hora (equivale a **1 chegada a cada 15 minutos**). |
+| **λ̄** | Taxa **efetiva de entrada** no sistema: em modelos com perda (ex.: sistema cheio) ou população finita, nem todo mundo que *poderia* entrar de fato entra; **λ̄** é a taxa média que **realmente** flui para dentro. | *Ex.:* “oferecem-se” **5/h**, mas só entram **3/h** → **λ̄ = 3/h** (os outros **2** desistem ou são bloqueados). |
+| **μ** | Taxa média de **serviço** (por unidade de tempo): quanto maior **μ**, mais rápido o atendimento em média. | *Ex.:* μ = **6 por hora** → em média **6 atendimentos** por hora (**10 minutos** por atendimento, em média). |
+| **ρ** | **Utilização** (ou intensidade de tráfego): mede o quanto o sistema está “carregado” em relação à capacidade de serviço. Em fila infinita, costuma exigir **ρ < 1** para o equilíbrio existir. | *Ex.:* λ = **3/h**, μ = **6/h** (1 servidor) → **ρ = 3/6 = 0,5** → o recurso fica **ocupado metade do tempo** (em equilíbrio, no M/M/1). |
+| **P₀** | Probabilidade do sistema estar **vazio** (nenhum cliente). | *Ex.:* **P₀ = 0,20** → em **20%** do tempo **ninguém** está na fila nem sendo atendido. |
+| **Pₙ** | Probabilidade de existirem **exatamente n** clientes no sistema (na fila + em serviço). | *Ex.:* **P₂ = 0,08** → em **8%** do tempo há **exatamente 2** pessoas no sistema (as duas contadas juntas). |
+| **L** | Número **médio** de clientes **no sistema** (fila + serviço). | *Ex.:* **L = 2,4** → se você “fotografar” o sistema várias vezes ao acaso, em média verá **2,4** clientes (dentro da fila **e** no atendimento). |
+| **Lq** | Número **médio** de clientes **apenas na fila** (aguardando, sem contar quem já está sendo atendido). | *Ex.:* **Lq = 1,1** → em média **1,1** pessoa **só esperando**; o restante de **L** está em serviço. |
+| **W** | Tempo **médio** que um cliente passa **no sistema** (espera + atendimento). | *Ex.:* **W = 0,5 h** (**30 min**) → da **chegada** à **saída**, em média meia hora. |
+| **Wq** | Tempo **médio** de **espera na fila** (antes de começar o atendimento). | *Ex.:* **Wq = 0,1 h** (**6 min**) → só a **fila**, antes de ser chamado, em média. |
+| **s** | Número de **servidores** (canais de atendimento em paralelo). | *Ex.:* **s = 3** → **três** atendentes (ou **três** máquinas de serviço) em paralelo. |
+| **K** | **Capacidade máxima** do sistema: número máximo de clientes admitidos (incluindo os em serviço); chegadas além disso são **perdidas** ou bloqueadas. | *Ex.:* **K = 5** → cabem no máximo **5** dentro; com **5** ocupados, o próximo **não entra** (vai embora ou é recusado). |
+| **N** | **Tamanho da população finita**: no modelo de **fonte finita**, só há **N** “potenciais” clientes; quando muitos já estão no sistema, a taxa de novas quebras/chegadas cai. | *Ex.:* **N = 20** máquinas → só essas **20** podem “pedir” serviço; se **12** já estão paradas, só **8** ainda podem gerar novas falhas. |
+| **C** | Probabilidade de **espera** (fila não vazia dado que alguém chegou), no contexto **Erlang-C** (M/M/s com fila infinita). | *Ex.:* **C = 0,40** → **40%** de chance de, ao chegar, você **precisar esperar** (não pegar servidor na hora). |
+| **σ²** | **Variância** do tempo de serviço: mede o quanto o tempo de atendimento **oscila** em torno da média; entra na fórmula de **Pollaczek–Khinchine** (M/G/1). | *Ex.:* média **10 min** por serviço, mas **σ²** grande → uns atendimentos de **5 min**, outros de **25 min**; a fila tende a piorar em relação ao caso “sempre 10 min”. |
+                """.strip()
+            )
+
+        with st.expander("🔧 Interpretação para Problemas de Manutenção", expanded=False):
+            st.markdown(
+                """
+Em provas de **manutenção de máquinas**, o mesmo desenho de teoria das filas aparece com “nomes trocados”.
+Pense assim (modelo com **um** técnico; com **vários**, **L** e **Lq** contam máquinas paradas e **1 − P₀** deixa de ser só “um técnico ocupado”):
+
+| Termo na fila | No enunciado de manutenção |
+|---------------|----------------------------|
+| **Cliente** | **Máquina quebrada** (ou na fila de conserto). |
+| **Servidor** | **Técnico** (ou posto de reparo) que atende **uma** máquina de cada vez, quando **s = 1**. |
+| **L** | **Máquinas paradas** no sistema: **em conserto + na fila** de espera. |
+| **Lq** | **Máquinas só na fila**: já quebraram, mas **ainda não** começaram o reparo. |
+| **N − L** | **Máquinas funcionando** (fora do “sistema” de paradas). |
+| **(N − L) / N** | **Proporção média** de máquinas **em operação** (entre **0** e **1**; multiplique por **100** para ter **%**). |
+| **1 − P₀** | **Fração do tempo** em que o técnico está **ocupado** (com **s = 1**): é a chance de haver **pelo menos uma** máquina parada ou em conserto — o sistema **não** está vazio. |
+
+**Dica:** compare sempre **L** com **N**. Se **L** está perto de **N**, quase todas as máquinas estão paradas; se **L** é pequeno, a oficina está tranquila. Use a calculadora para conferir **N − L** e **(N − L)/N** sem refazer conta na prova.
+                """.strip()
+            )
+
+        st.caption("Abra cada bloco abaixo para ver as fórmulas e a leitura intuitiva de cada modelo.")
+        st.markdown("---")
+        st.markdown("### Fórmulas por modelo")
 
         with st.expander("📌 M/M/1 — Clássico (1 servidor, fila infinita)"):
             st.markdown(
                 """
+**Fórmulas**
 - **ρ = λ/μ** (deve ser < 1 para estabilidade)
 - **P₀ = 1 − ρ** · **Pₙ = (1−ρ)·ρⁿ** para n = 0,1,2,…
 - **L = ρ/(1−ρ)** · **Lq = ρ²/(1−ρ)**
 - **W = 1/(μ−λ)** · **Wq = ρ/(μ−λ)**
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- **ρ = λ/μ** → fração média de tempo em que o **servidor está ocupado** (no equilíbrio, coincide com a probabilidade de o sistema não estar vazio).
+- **P₀ = 1 − ρ** → chance de **ninguém** estar no sistema (fila vazia e servidor ocioso).
+- **Pₙ** → chance de haver **n pessoas** no sistema ao mesmo tempo (geometria em **ρ**).
+- **L** → “em média, **quantas pessoas** vejo no sistema se olhar aleatoriamente no tempo?”
+- **Lq** → “em média, **quantas estão só esperando**?”
+- **W** → tempo médio **total** na loja/atendimento: da chegada até sair.
+- **Wq** → tempo médio **só na fila**, antes de ser chamado.
+                """.strip()
+            )
+
         with st.expander("📌 M/M/s — Clássico (s servidores, fila infinita)"):
             st.markdown(
                 """
+**Fórmulas**
 - **ρ = λ/(sμ)** (deve ser < 1) · **r = λ/μ**
 - **P₀ = [Σₙ₌₀ˢ⁻¹ rⁿ/n! + rˢ/(s!·(1−ρ))]⁻¹**
 - **C (Erlang-C)** = prob. de espera = **[rˢ/(s!·(1−ρ))]·P₀**
@@ -1097,49 +1166,134 @@ def main():
 - **Wq = Lq/λ** · **W = Wq + 1/μ**
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- **ρ = λ/(sμ)** → utilização do **conjunto** de **s** servidores: a demanda **λ** é dividida pela capacidade **sμ**.
+- **P₀** → todos os **s** lugares ociosos ao mesmo tempo (sistema vazio).
+- **C** → ao chegar e precisar esperar, qual a chance de a fila **não** estar vazia (modelo Erlang-C).
+- **Lq** e **L** → fila e sistema em **número médio de clientes**; com mais servidores, para o mesmo **ρ**, a fila tende a encurtar.
+- **Wq** e **W** → mesma leitura que no M/M/1, mas agora com **vários** atendentes em paralelo.
+                """.strip()
+            )
+
         with st.expander("📌 M/M/1/K — Capacidade finita, 1 servidor"):
             st.markdown(
                 """
+**Fórmulas**
 - **ρ = λ/μ** · **P₀ = (1−ρ)/(1−ρᴷ⁺¹)**
 - **Pₙ = P₀·ρⁿ** para n=1,…,K
 - **L = ρ/(1−ρ) − (K+1)ρᴷ⁺¹/(1−ρᴷ⁺¹)**  ·  **Lq = L − (1−P₀)**
 - **λ̄ = λ(1−Pₖ)**  ·  **W = L/λ̄**  ·  **Wq = Lq/λ̄**
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- O sistema **não aceita** mais de **K** clientes: quando está cheio, chegadas são **rejeitadas** (ou perdidas).
+- **Pₖ** → chance de o sistema estar **no limite**; **λ̄ = λ(1−Pₖ)** é a taxa média que **entra** (só quem não encontrou fila “trancada”).
+- **L** e **Lq** → clientes **dentro** do limite **K**; a fila não pode crescer sem fim.
+- **W** e **Wq** usam **λ̄** no denominador porque o **Little** e o tempo médio devem considerar quem **de fato** entrou no sistema.
+                """.strip()
+            )
+
         with st.expander("📌 M/M/s/K — Capacidade finita, s servidores"):
             st.markdown(
                 """
+**Fórmulas**
 - **ρ = λ/(sμ)** · P₀ calculada via dupla somatória
 - Pₙ = (λ/μ)ⁿ/n!·P₀ para n≤s  |  Pₙ = (λ/μ)ⁿ/(s!·sⁿ⁻ˢ)·P₀ para s<n≤K
 - **Lq** via fórmula fechada com ρᴷ⁻ˢ
 - L = Σ nPₙ + Lq + s(1−Σ Pₙ), n<s
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- Generalização do M/M/1/K: **vários servidores** e **teto K** no total de clientes.
+- **ρ** continua medindo o **carregamento** frente à capacidade **sμ**; porém a fila **trunca** em **K**.
+- **Pₙ** descreve como a massa de probabilidade se reparte entre estados **0 … K**; perto do limite, **perda** de chegadas torna **λ̄ < λ**.
+- **L**, **Lq**, **W** e **Wq** têm a mesma leitura intuitiva de “quantos / quanto tempo”, mas sempre **respeitando o teto** e a taxa efetiva **λ̄**.
+                """.strip()
+            )
+
         with st.expander("📌 M/M/1/N — População finita, 1 servidor"):
             st.markdown(
                 """
+**Fórmulas**
 - Taxa efetiva = (N−n)λ quando há n no sistema
 - **P₀ = 1/Σ[N!/(N−n)!·(λ/μ)ⁿ]**
 - **L = N − (μ/λ)(1−P₀)**  ·  **Lq = N − ((λ+μ)/λ)(1−P₀)**
 - **λ̄ = λ(N−L)**
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- Há apenas **N** entidades que podem “quebrar” ou solicitar serviço; quando muitas já estão no sistema, **poucas restam** fora para gerar novas falhas → a taxa de entrada **cai**.
+- **λ̄ = λ(N−L)** liga explicitamente a taxa de entrada ao número **médio fora** do sistema (**N − L**).
+- **L** inclui quem está **em conserto** e quem **espera**; **Lq** isola a fila de espera.
+- **P₀** é a chance de **ninguém** no sistema; **1 − P₀** mede o tempo em que há **pelo menos um** cliente em serviço ou na fila.
+                """.strip()
+            )
+            st.markdown("#### 🔧 Interpretação para manutenção de máquinas")
+            st.markdown(
+                """
+| No modelo | Na manutenção |
+|-----------|----------------|
+| **Cliente** | **Máquina quebrada** (ou em fila de reparo). |
+| **Servidor** | **Técnico** (ou equipe) que repara **uma** máquina por vez. |
+| **L** | **Máquinas paradas** no sistema (em reparo + na fila). |
+| **Lq** | **Máquinas paradas só aguardando** técnico (ainda não em reparo). |
+| **N − L** | **Máquinas operando** (fora do sistema de filas). |
+| **(N − L)/N** | **Proporção média** de máquinas **funcionando**. |
+| **1 − P₀** | **Fração do tempo** em que **pelo menos um** técnico está **ocupado** (com **s = 1**, equivale à utilização do reparador). |
+                """.strip()
+            )
+
         with st.expander("📌 M/M/s/N — População finita, s servidores"):
             st.markdown(
                 """
+**Fórmulas**
 - Pₙ análogo ao M/M/1/N mas com fator s! e sⁿ⁻ˢ para n≥s
 - **L = Σ n·Pₙ**  ·  **Lq = L − (λ/μ)(N−L)**  ·  **λ̄ = λ(N−L)**
                 """
             )
-        with st.expander("📌 M/G/1 — Fórmula de Pollaczek-Khintchine"):
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
             st.markdown(
                 """
+- **s** técnicos podem trabalhar **em paralelo**: mais de uma máquina pode estar em reparo ao mesmo tempo.
+- **λ̄ = λ(N−L)** permanece: a taxa de novas falhas é proporcional às máquinas **ainda operando**.
+- **L** e **Lq** contam **máquinas paradas** no agregado; a fila **Lq** separa quem **espera** vaga de reparo.
+- **λ̄/(sμ)** (no app, o mesmo **ρ** do modelo) mede a **utilização média do grupo** de **s** servidores.
+                """.strip()
+            )
+            st.markdown("#### 🔧 Interpretação para manutenção de máquinas")
+            st.markdown(
+                """
+| No modelo | Na manutenção |
+|-----------|----------------|
+| **Cliente** | **Máquina quebrada**. |
+| **Servidor** | **Técnico**; há **s** canais de reparo simultâneo. |
+| **L** | **Máquinas paradas** (em conserto + na fila). |
+| **Lq** | **Máquinas só na fila**, aguardando técnico livre. |
+| **N − L** | **Máquinas operando**. |
+| **(N − L)/N** | **Proporção média** de máquinas **em operação**. |
+| **1 − P₀** | Probabilidade de haver **pelo menos uma** máquina no sistema (parada ou em serviço); com **s = 1**, coincide com “há trabalho para o técnico”. Com **s > 1**, use também **λ̄/(sμ)** para ocupação **média** do **conjunto** de técnicos. |
+                """.strip()
+            )
+
+        with st.expander("📌 M/G/1 — Fórmula de Pollaczek–Khinchine"):
+            st.markdown(
+                """
+**Fórmulas**
 - Chegadas Poisson(λ), serviço qualquer distribuição com média **1/μ** e variância **σ²**
 - **ρ = λ/μ**  ·  **P₀ = 1 − ρ**
-- **Lq = (λ²σ² + ρ²) / (2(1−ρ))**  ← fórmula P-K
+- **Lq = (λ²σ² + ρ²) / (2(1−ρ))**  ← fórmula P–K
 - **L = ρ + Lq**  ·  **Wq = Lq/λ**  ·  **W = Wq + 1/μ**
 
-Casos especiais:
+**Casos especiais**
+
 | Distribuição | σ² | Lq |
 |---|---|---|
 | Exponencial (M/M/1) | 1/μ² | ρ²/(1−ρ) |
@@ -1148,6 +1302,16 @@ Casos especiais:
 > **Lq(M/D/1) = ½ · Lq(M/M/1)** sempre!
                 """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- Continua **uma fila** e **um servidor**, mas o tempo de serviço **não precisa ser exponencial**; basta conhecer **média** (**1/μ**) e **variância** (**σ²**).
+- **σ²** grande → atendimentos **muito irregulares** → fila tende a crescer (**Lq** sobe) mesmo com o mesmo **ρ**.
+- **σ² = 1/μ²** recai no caso **M/M/1**; **σ² = 0** (serviço fixo) aproxima o **M/D/1** e reduz a fila pela metade na comparação clássica acima.
+- **L = ρ + Lq**: em média há **ρ** clientes em serviço (um só lugar) mais **Lq** esperando.
+                """.strip()
+            )
+
         with st.expander("📌 Prioridades — Com interrupção (Preemptivo)"):
             st.markdown(
                 """
@@ -1155,25 +1319,21 @@ O cliente em atendimento é **interrompido** quando chega um de prioridade maior
 
 **W_k = (1/μ) / [(1 − A_{k−1})(1 − A_k)]**
 
-onde
+onde **A_k = Σᵢ₌₁ᵏ ρᵢ** e **ρᵢ = λᵢ/(sμ)**
 
-**A_k = Σᵢ₌₁ᵏ ρᵢ**
-
-e
-
-**ρᵢ = λᵢ/(sμ)**
-
-Com
-
-**Λ_k = Σᵢ₌₁ᵏ λᵢ**
-
-temos:
-
-- **Wq_k = W_k − 1/μ**
-- **L_k = Λ_k · W_k**
-- **Lq_k = L_k − Λ_k/μ**
-        """
+- Lq_k = L_k − λ_k/μ  ·  Wq_k = W_k − 1/μ  ·  L_k = λ_k · W_k
+                """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- Cada classe **k** tem sua própria taxa **λₖ**; classes com **k menor** (maior prioridade) “furam” a fila e podem **expulsar** quem está sendo atendido.
+- **ρᵢ** mede o peso da classe **i** na capacidade **sμ**; **A_k** acumula o tráfego das classes **até k**.
+- **W_k** é o tempo médio **no sistema** para quem é da classe **k**, já contando recomeços após preempção.
+- **L_k** e **Lq_k** ligam tempo e vazão das classes acumuladas (**Λ_k**) da mesma forma que no modelo sem prioridade, mas com **W_k** maior para baixas prioridades.
+                """.strip()
+            )
+
         with st.expander("📌 Prioridades — Sem interrupção (Não-preemptivo)"):
             st.markdown(
                 """
@@ -1181,23 +1341,21 @@ O cliente em atendimento **conclui** antes de ceder lugar a um de maior priorida
 
 **W_k = 1 / [(s!·(sμ−λ)/rˢ·Σrʲ/j! + sμ)·(1−A_{k−1})·(1−A_k)] + 1/μ**
 
-onde
+onde **r = λ/μ** e **A_k = Σᵢ₌₁ᵏ ρᵢ**
 
-**r = λ/μ**
-
-**A_k = Σᵢ₌₁ᵏ ρᵢ**
-
-**ρᵢ = λᵢ/(sμ)**
-
-Temos ainda:
-
-- **Wq_k = W_k − 1/μ**
-- **L_k = λ_k · W_k**
-- **Lq_k = λ_k · Wq_k**
-
-Para **s = 1**, o termo base se simplifica diretamente.
-        """
+Para s=1: o termo base se simplifica diretamente.
+                """
             )
+            st.markdown("#### 🔍 Interpretação das Fórmulas")
+            st.markdown(
+                """
+- Aqui o atendimento **não é cortado**: quem já está no servidor **termina** antes de trocar a ordem.
+- Ainda assim, classes de maior prioridade **esperam menos** em média: o termo com **(1−A_{k−1})(1−A_k)** reflete o “peso” acumulado das prioridades à frente.
+- **L_k = λ_k W_k** usa a **própria** taxa **λ_k** da classe (diferente do preemptivo, onde entra **Λ_k**).
+- **Wq_k** remove o tempo médio de **serviço** **1/μ** do tempo total **W_k** para isolar a espera.
+                """.strip()
+            )
+
         with st.expander("📖 Referências"):
             st.markdown(
                 """
