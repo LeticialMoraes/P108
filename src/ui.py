@@ -42,37 +42,102 @@ def metrics_html(items):
     return html + '</div>'
 
 
-def show_results(res, title, time_unit="min"):
+def show_results(res, title, time_unit="min", N=None, finite_model=None, s_servers=1):
     st.markdown(f'<div class="section-title">📊 {title}</div>', unsafe_allow_html=True)
+
     items = [
         ("P₀", f"{res['P0']:.5f}", "prob. sistema vazio"),
         ("ρ", f"{res['rho']:.4f}", "utilização"),
     ]
+
     if 'lam_eff' in res:
         items.append(("λ̄", f"{res['lam_eff']:.4f}", f"taxa efetiva ({time_unit}⁻¹)"))
+
     if 'PK' in res:
         items.append(("P_K", f"{res['PK']:.5f}", "prob. bloqueio"))
+
     items += [
         ("L", f"{res['L']:.4f}", "clientes no sistema"),
         ("Lq", f"{res['Lq']:.4f}", "clientes na fila"),
         ("W", f"{res['W']:.4f}", f"tempo no sistema ({time_unit})"),
         ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
     ]
+
+    if 'P_Wq_1' in res:
+        items += [
+            (
+                "P(Wq>1)",
+                f"{res['P_Wq_1']*100:.2f}%",
+                "espera > 1 unidade"
+            ),
+            (
+                "P(W>1)",
+                f"{res['P_W_1']*100:.2f}%",
+                "sistema > 1 unidade"
+            ),
+        ]
+
+    if N is not None and finite_model is None:
+        ativos = N - res["L"]
+        items.append(("N − L", f"{ativos:.4f}", "população ativa (operacional)"))
     st.markdown(metrics_html(items), unsafe_allow_html=True)
+
+    if finite_model == "mm1n" and N is not None:
+        L = float(res["L"])
+        p0 = float(res["P0"])
+        util_srv = 1.0 - p0
+        n_minus_l = float(N) - L
+        prop = n_minus_l / float(N) if N else float("nan")
+        op_items = [
+            ("1 − P₀", f"{util_srv:.5f}", "utilização do servidor"),
+            ("(N − L)/N", f"{prop:.5f}", "prop. média da pop. operando"),
+            ("N − L", f"{n_minus_l:.4f}", "qtd. média da pop. operando"),
+        ]
+        st.markdown(
+            '<div class="section-title" style="margin-top:1.1rem">🔧 Indicadores operacionais</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(metrics_html(op_items), unsafe_allow_html=True)
+
+    elif finite_model == "mmsn" and N is not None:
+        L = float(res["L"])
+        n_minus_l = float(N) - L
+        prop = n_minus_l / float(N) if N else float("nan")
+        rho_bar = float(res["rho"])
+        s_v = int(s_servers)
+        op_items = [
+            ("N − L", f"{n_minus_l:.4f}", "qtd. média da pop. operando"),
+            ("(N − L)/N", f"{prop:.5f}", "prop. média da pop. operando"),
+            ("λ̄/(sμ)", f"{rho_bar:.5f}", f"util. média dos servidores (s = {s_v})"),
+        ]
+        st.markdown(
+            '<div class="section-title" style="margin-top:1.1rem">🔧 Indicadores operacionais</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(metrics_html(op_items), unsafe_allow_html=True)
+
     if 'Pn' in res:
         c1, c2 = st.columns([1, 2])
+
         with c1:
             st.markdown('<div class="section-title">Tabela P(n)</div>', unsafe_allow_html=True)
+
             df = pd.DataFrame({
                 "n": range(len(res['Pn'])),
                 "P(n)": [f"{p:.6f}" for p in res['Pn']],
                 "%": [f"{p*100:.3f}%" for p in res['Pn']],
             })
-            st.dataframe(df, use_container_width=True, hide_index=True, height=280)
+
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                height=280
+            )
+
         with c2:
             st.markdown('<div class="section-title">Gráfico</div>', unsafe_allow_html=True)
             st.pyplot(plot_probs(res['Pn']), use_container_width=True)
-
 
 def show_priority_results(results, time_unit="min"):
     for r in results:
