@@ -145,23 +145,46 @@ def mg1(lam, mu, sigma2=None):
 
 def priority_preemptive(lambdas, mu, s=1):
     K = len(lambdas)
+
     rho = [l / (s * mu) for l in lambdas]
+
     cumrho = [0.0]
     for r in rho:
         cumrho.append(cumrho[-1] + r)
+
     results = []
+
     for k in range(K):
         prev = cumrho[k]
         curr = cumrho[k + 1]
+
         lk = lambdas[k]
+
         if abs(1 - prev) < 1e-12 or abs(1 - curr) < 1e-12:
             Wk = float('inf')
         else:
             Wk = (1 / mu) / ((1 - prev) * (1 - curr))
+
         Wqk = Wk - 1 / mu
-        Lk = lk * Wk
-        Lqk = lk * Wqk
-        results.append(dict(k=k + 1, lam=lk, rho=rho[k], W=Wk, Wq=max(Wqk, 0), L=Lk, Lq=max(Lqk, 0)))
+
+        # igual ao gabarito
+        lam_acum = sum(lambdas[:k+1])
+
+        Lk = lam_acum * Wk
+        Lqk = Lk - (lam_acum / mu)
+
+        results.append(
+            dict(
+                k=k + 1,
+                lam=lk,
+                rho=rho[k],
+                W=Wk,
+                Wq=max(Wqk, 0),
+                L=Lk,
+                Lq=max(Lqk, 0)
+            )
+        )
+
     return results
 
 
