@@ -688,6 +688,37 @@ def main():
                     help="Exponencial: σ² = (1/μ)² na mesma base que E[S]. Ex.: se μ em 1/min, σ² em min².",
                 )
 
+            # ── Probabilidades de excesso: P(W>t) e P(Wq>t) — só M/M/1 e M/M/s ──
+            t_w_input = None
+            t_wq_input = None
+            t_w_sec = None
+            t_wq_sec = None
+            n_input = None
+            if model_key in ("M/M/1", "M/M/s"):
+                st.markdown("---")
+                st.markdown("**Probabilidades de excesso (opcional)**")
+                st.caption(
+                    "Informe os limites t para calcular P(W > t) e P(Wq > t), "
+                    "e o número n de clientes para P(N > n)."
+                )
+                t_w_input = st.number_input(
+                    f"Limite t para P(W > t) ({time_unit})",
+                    min_value=0.0, value=1.0, step=0.1, format="%.4f", key="t_w_input",
+                )
+                t_wq_input = st.number_input(
+                    f"Limite t para P(Wq > t) ({time_unit})",
+                    min_value=0.0, value=1.0, step=0.1, format="%.4f", key="t_wq_input",
+                )
+                n_input = st.number_input(
+                    "n para P(N > n)  — nº de clientes no sistema",
+                    min_value=0, value=5, step=1, key="n_input",
+                    help="Ex.: 5 calcula a probabilidade de haver mais de 5 clientes no sistema.",
+                )
+                t_w_sec = duration_to_seconds(t_w_input, time_unit) if t_w_input and t_w_input > 0 else None
+                t_wq_sec = duration_to_seconds(t_wq_input, time_unit) if t_wq_input and t_wq_input > 0 else None
+            else:
+                n_input = None
+
             input_audit = {
                 "entrada_chegadas": entrada_chegadas,
                 "modo_servico": modo_servico,
@@ -725,6 +756,7 @@ def main():
             lam_sec = mu_sec = None
             lam_title = mu_title = None
             unidade_sigma2 = "min"
+            t_w_input = t_wq_input = t_w_sec = t_wq_sec = n_input = None
 
             st.markdown("**Número de classes de prioridade**")
             num_classes = st.number_input("Classes", min_value=2, max_value=6, value=3, step=1)
@@ -837,7 +869,7 @@ def main():
                     rho_simple = lam_sec / mu_sec if mu_sec and mu_sec > 0 else float("inf")
 
                     if model_key == "M/M/1":
-                        res_raw = mm1(lam_sec, mu_sec)
+                        res_raw = mm1(lam_sec, mu_sec, t_w=t_w_sec, t_wq=t_wq_sec, n=n_input)
                         if res_raw is None:
                             st.error(f"ρ = {rho_simple:.3f} ≥ 1. Sistema instável.")
                         else:
@@ -846,11 +878,13 @@ def main():
                                 res,
                                 f"M/M/1  λ={lam_title:.4f} μ={mu_title:.4f} ({title_rates})",
                                 time_unit,
+                                t_w_disp=t_w_input,
+                                t_wq_disp=t_wq_input,
                             )
 
                     elif model_key == "M/M/s":
                         s_v = int(s)
-                        res_raw = mms(lam_sec, mu_sec, s_v)
+                        res_raw = mms(lam_sec, mu_sec, s_v, t_w=t_w_sec, t_wq=t_wq_sec, n=n_input)
                         rho_s = lam_sec / (s_v * mu_sec) if mu_sec else float("inf")
                         if res_raw is None:
                             st.error(f"ρ = {rho_s:.3f} ≥ 1. Sistema instável.")
@@ -860,6 +894,8 @@ def main():
                                 res,
                                 f"M/M/{s_v}  λ={lam_title:.4f} μ={mu_title:.4f} s={s_v} ({title_rates})",
                                 time_unit,
+                                t_w_disp=t_w_input,
+                                t_wq_disp=t_wq_input,
                             )
                             st.markdown(
                                 f"""<div class="info-box">
@@ -1140,6 +1176,7 @@ Pense assim (modelo com **um** técnico; com **vários**, **L** e **Lq** contam 
 - **P₀ = 1 − ρ** · **Pₙ = (1−ρ)·ρⁿ** para n = 0,1,2,…
 - **L = ρ/(1−ρ)** · **Lq = ρ²/(1−ρ)**
 - **W = 1/(μ−λ)** · **Wq = ρ/(μ−λ)**
+- **P(W>t) = e^(−(μ−λ)t)** · **P(Wq>t) = ρ·e^(−(μ−λ)t)**
                 """
             )
             st.markdown("#### 🔍 Interpretação das Fórmulas")
@@ -1152,6 +1189,7 @@ Pense assim (modelo com **um** técnico; com **vários**, **L** e **Lq** contam 
 - **Lq** → “em média, **quantas estão só esperando**?”
 - **W** → tempo médio **total** na loja/atendimento: da chegada até sair.
 - **Wq** → tempo médio **só na fila**, antes de ser chamado.
+- **P(W>t)** e **P(Wq>t)** → qual a chance de um cliente esperar **mais do que** um limite **t** escolhido por você (ex.: mais de 20 minutos no sistema, ou mais de 15 minutos só na fila).
                 """.strip()
             )
 
@@ -1164,6 +1202,8 @@ Pense assim (modelo com **um** técnico; com **vários**, **L** e **Lq** contam 
 - **C (Erlang-C)** = prob. de espera = **[rˢ/(s!·(1−ρ))]·P₀**
 - **Lq = C·ρ/(1−ρ)** · **L = Lq + r**
 - **Wq = Lq/λ** · **W = Wq + 1/μ**
+- **P(Wq>t) = C·e^(−sμ(1−ρ)t)** (exato, fórmula de Erlang-C com cauda exponencial)
+- **P(W>t)**: obtido pela convolução exata de **Wq** com o serviço exponencial (ver código)
                 """
             )
             st.markdown("#### 🔍 Interpretação das Fórmulas")
@@ -1174,6 +1214,7 @@ Pense assim (modelo com **um** técnico; com **vários**, **L** e **Lq** contam 
 - **C** → ao chegar e precisar esperar, qual a chance de a fila **não** estar vazia (modelo Erlang-C).
 - **Lq** e **L** → fila e sistema em **número médio de clientes**; com mais servidores, para o mesmo **ρ**, a fila tende a encurtar.
 - **Wq** e **W** → mesma leitura que no M/M/1, mas agora com **vários** atendentes em paralelo.
+- **P(Wq>t)** e **P(W>t)** → chance de a espera (só na fila, ou no sistema todo) **superar** o limite **t** que você definir na barra lateral.
                 """.strip()
             )
 

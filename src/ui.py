@@ -42,7 +42,7 @@ def metrics_html(items):
     return html + '</div>'
 
 
-def show_results(res, title, time_unit="min", N=None, finite_model=None, s_servers=1):
+def show_results(res, title, time_unit="min", N=None, finite_model=None, s_servers=1, t_w_disp=None, t_wq_disp=None):
     st.markdown(f'<div class="section-title">📊 {title}</div>', unsafe_allow_html=True)
 
     items = [
@@ -63,19 +63,26 @@ def show_results(res, title, time_unit="min", N=None, finite_model=None, s_serve
         ("Wq", f"{res['Wq']:.4f}", f"espera na fila ({time_unit})"),
     ]
 
-    if 'P_Wq_1' in res:
-        items += [
-            (
-                "P(Wq>1)",
-                f"{res['P_Wq_1']*100:.2f}%",
-                "espera > 1 unidade"
-            ),
-            (
-                "P(W>1)",
-                f"{res['P_W_1']*100:.2f}%",
-                "sistema > 1 unidade"
-            ),
-        ]
+    if res.get('P_Wq_t') is not None and t_wq_disp is not None:
+        items.append((
+            f"P(Wq>{t_wq_disp:g})",
+            f"{res['P_Wq_t']*100:.2f}%",
+            f"espera na fila > {t_wq_disp:g} {time_unit}"
+        ))
+
+    if res.get('P_W_t') is not None and t_w_disp is not None:
+        items.append((
+            f"P(W>{t_w_disp:g})",
+            f"{res['P_W_t']*100:.2f}%",
+            f"tempo no sistema > {t_w_disp:g} {time_unit}"
+        ))
+    
+    if res.get('P_N_gt_n') is not None and res.get('n_threshold') is not None:
+        items.append((
+            f"P(N>{res['n_threshold']})",
+            f"{res['P_N_gt_n']*100:.2f}%",
+            "prob. de mais que n clientes no sistema"
+        ))
 
     if N is not None and finite_model is None:
         ativos = N - res["L"]

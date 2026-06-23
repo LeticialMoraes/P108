@@ -5,49 +5,37 @@ def fac(n):
     return math.factorial(int(n))
 
 
-def mm1(lam, mu):
+def mm1(lam, mu, t_w=None, t_wq=None, n=None):
     if mu <= 0:
         return None
-
     if lam < 0:
         return None
 
     rho = lam / mu
-
     if rho >= 1:
         return None
 
     P0 = 1 - rho
-
     Lq = rho**2 / (1 - rho)
     L = rho + Lq
-
     Wq = Lq / lam
     W = Wq + (1 / mu)
 
-    # Probabilidades extras
-    P_Wq_1 = rho * math.exp(-(mu - lam))
-    P_W_1 = math.exp(-(mu - lam))
+    P_Wq_t = rho * math.exp(-(mu - lam) * t_wq) if t_wq is not None else None
+    P_W_t = math.exp(-(mu - lam) * t_w) if t_w is not None else None
+    P_N_gt_n = rho ** (n + 1) if n is not None else None
 
     return dict(
-        P0=P0,
-        rho=rho,
-        L=L,
-        Lq=Lq,
-        W=W,
-        Wq=Wq,
-        P_Wq_1=P_Wq_1,
-        P_W_1=P_W_1
+        P0=P0, rho=rho, L=L, Lq=Lq, W=W, Wq=Wq,
+        P_Wq_t=P_Wq_t, P_W_t=P_W_t, t_w=t_w, t_wq=t_wq,
+        P_N_gt_n=P_N_gt_n, n_threshold=n
     )
 
-
-def mms(lam, mu, s):
+def mms(lam, mu, s, t_w=None, t_wq=None, n=None):
     if mu <= 0:
         return None
-    
     if lam < 0:
         return None
-    
     if s < 1:
         return None
 
@@ -55,7 +43,8 @@ def mms(lam, mu, s):
     r = lam / mu
     if rho >= 1:
         return None
-    sum_terms = sum(r**n / fac(n) for n in range(s))
+
+    sum_terms = sum(r**n_ / fac(n_) for n_ in range(s))
     last = r**s / (fac(s) * (1 - rho))
     P0 = 1 / (sum_terms + last)
     C = last * P0
@@ -63,8 +52,45 @@ def mms(lam, mu, s):
     L = Lq + r
     Wq = Lq / lam
     W = Wq + 1 / mu
-    return dict(P0=P0, rho=rho, C=C, L=L, Lq=Lq, W=W, Wq=Wq)
 
+    P_Wq_t = None
+    P_W_t = None
+    a = s * mu - lam
+
+    if t_wq is not None:
+        P_Wq_t = C * math.exp(-a * t_wq)
+
+    if t_w is not None:
+        if abs(a - mu) < 1e-9:
+            P_W_t = (
+                C * math.exp(-a * t_w)
+                + (1 - C) * math.exp(-mu * t_w)
+                + C * a * t_w * math.exp(-mu * t_w)
+            )
+        else:
+            P_W_t = (
+                C * math.exp(-a * t_w)
+                + (1 - C) * math.exp(-mu * t_w)
+                + C * a * math.exp(-mu * t_w) * (1 - math.exp(-(a - mu) * t_w)) / (a - mu)
+            )
+
+    P_N_gt_n = None
+    if n is not None:
+        if n + 1 <= s:
+            # soma P0..Pn diretamente (estados abaixo de s servidores)
+            def _pk(k):
+                return (r**k / fac(k)) * P0
+            cum = sum(_pk(k) for k in range(n + 1))
+            P_N_gt_n = max(1 - cum, 0.0)
+        else:
+            # n >= s: usa a cauda geométrica a partir de C
+            P_N_gt_n = C * rho ** (n + 1 - s)
+
+    return dict(
+        P0=P0, rho=rho, C=C, L=L, Lq=Lq, W=W, Wq=Wq,
+        P_Wq_t=P_Wq_t, P_W_t=P_W_t, t_w=t_w, t_wq=t_wq,
+        P_N_gt_n=P_N_gt_n, n_threshold=n
+    )
 
 def mm1k(lam, mu, K):
     if mu <= 0:
